@@ -132,9 +132,12 @@ static void init()
 	prog->addAttribute("aNor");
 	prog->setVerbose(false);
 
-	//create the robot with component
+
+
 	robot.setResourceDir(RESOURCE_DIR);
 	robot.create();
+
+
 	// If there were any OpenGL errors, this will print something.
 	// You can intersperse this line in your code to find the exact location
 	// of your OpenGL error.
@@ -160,10 +163,10 @@ static void render()
 	// Apply projection.
 	P->pushMatrix();
 	P->multMatrix(glm::perspective((float)(45.0*M_PI / 180.0), aspect, 0.01f, 100.0f));
-
 	// Apply camera transform.
 	MV->pushMatrix();
 	MV->translate(glm::vec3(0, 2.5, -30));
+
 	robot.draw(P, MV, prog);
 
 	// Pop matrix stacks.

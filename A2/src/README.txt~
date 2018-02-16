@@ -1,0 +1,14 @@
+Name: Chau Ngo
+
+
+References:
+http://www.glfw.org/docs/3.0/group__time.html	
+https://www.geeksforgeeks.org/depth-first-traversal-for-a-graph/
+http://www.glfw.org/docs/latest/group__mods.html#ga6b64ba10ea0227cf6f42efd0a220aba1
+http://www.cs.brandeis.edu/~cs155/OpenGL%20Lecture_04.pdf
+https://www.opengl.org/resources/libraries/glut/spec3/node73.html
+https://stackoverflow.com/questions/40957113/how-to-detect-lowercase-letters
+ 
+Notes: 
+.The program will able to show current selection with a different size.
+.The uppercase letter is using Shift + x/y/z. 

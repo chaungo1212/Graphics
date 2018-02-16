@@ -1,0 +1,345 @@
+#include <cassert>
+#include <cstring>
+#include <cmath>
+#include <iostream>
+#include <vector>
+#include <map>
+
+#include "GLSL.h"
+#include "MatrixStack.h"
+#include "Program.h"
+#include "Shape.h"
+#include "GLSL.h"
+#include "Component.h"
+
+using namespace std;
+using namespace glm;
+
+Component::Component(vector<vec3> icompDef, int id, string RESOURCE_DIR){
+	shape = make_shared<Shape>();
+	shape->loadMesh(RESOURCE_DIR + "cube.obj");
+	shape->init();
+	this->ID= id;
+	this->compDef = icompDef;
+}
+
+
+void Component::addChild(Component* childComp){
+	this->children.push_back(childComp);
+}
+
+
+void Component::draw(shared_ptr<MatrixStack> P, shared_ptr<MatrixStack> MV, const shared_ptr<Program> prog){
+	//draws self, then recursively draws all other 
+	MV->pushMatrix();
+	MV->translate(this->compDef[0]);
+	MV->rotate(((this->compDef[1].x * PI)/36),vec3(1,0,0));  // Previouse we set dividing by 180, but the rotation is too small. 
+	MV->rotate(((this->compDef[1].y * PI)/36),vec3(0,1,0));  // So, we determine to increase the unit rather than comparing with 180.
+	MV->rotate(((this->compDef[1].z * PI)/36),vec3(0,0,1));
+	MV->pushMatrix();
+	MV->translate(this->compDef[2]);
+	MV->scale(this->compDef[3]);
+	
+	prog->bind();
+	glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, &P->topMatrix()[0][0]);
+	glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, &MV->topMatrix()[0][0]);
+	shape->draw(prog);//this will change to be using the robot draw
+	prog->unbind();
+	MV->popMatrix();
+	
+	int index = 0;
+	while(true){
+		
+		if(index == (int)this->children.size())
+			break;
+		this->children[index]->draw(P,MV,prog);
+		index++;
+	}
+	MV->popMatrix();
+	
+}
+
+Robot::~Robot(){
+	for(size_t i = 0; i < this->trajectory.size(); i++){
+		delete this->trajectory[i];	
+	}
+	this->root = NULL;
+}
+
+void Robot::setResourceDir(string RESOURCE_DIR){
+	this->resourceDir = RESOURCE_DIR;
+}
+
+void Robot::draw(shared_ptr<MatrixStack> P, shared_ptr<MatrixStack> MV, const shared_ptr<Program> prog){
+	this->root->draw(P, MV, prog);
+}
+
+void Robot::create(){
+	int ID = 0;
+	vector<vec3> TorsoDef(4);
+	TorsoDef[0] = vec3(0, 0, 0);
+	TorsoDef[1] = vec3(0, 0, 0);
+	TorsoDef[2] = vec3(0, 0, 0);
+	TorsoDef[3] = vec3(6, 8, 5);
+	Component Torso(TorsoDef, ID, this->resourceDir); 
+	cout << "Torso:" << ID << endl;
+	ID++;
+	
+	vector<vec3> HeadDef(4);
+	HeadDef[0] = vec3(0, 4, 0);
+	HeadDef[1] = vec3(0, 0, 0);
+	HeadDef[2] = vec3(0, 1.5, 0);
+	HeadDef[3] = vec3(3, 3, 3);
+	Component *Head = new Component(HeadDef, ID, this->resourceDir);
+	cout << "Head:" << ID << endl;
+	ID++;
+	
+	vector<vec3> UpperLeftArmDef(4);
+	UpperLeftArmDef[0] = vec3(3, 2, 0);
+	UpperLeftArmDef[1] = vec3(0, 0, 0);
+	UpperLeftArmDef[2] = vec3(2, 0, 0);
+	UpperLeftArmDef[3] = vec3(4, 1.5, 2);
+	Component *UpperLeftArm = new Component(UpperLeftArmDef, ID, this->resourceDir);
+	cout << "UpperLeftArm:" << ID << endl;
+	ID++;
+	
+	vector<vec3> LowerLeftArmDef(4);
+	LowerLeftArmDef[0] = vec3(4, 0, 0);
+	LowerLeftArmDef[1] = vec3(0, 0, 0);
+	LowerLeftArmDef[2] = vec3(2, 0, 0);
+	LowerLeftArmDef[3] = vec3(4, 1, 2);
+	Component *LowerLeftArm = new Component(LowerLeftArmDef, ID, this->resourceDir);
+	cout << "LowerLeftArm:" << ID << endl;
+	ID++;
+	UpperLeftArm->addChild(LowerLeftArm); // Link the upper and the lower parts of the left arm.
+	
+	vector<vec3> UpperRightArmDef(4);	
+	UpperRightArmDef[0] = vec3(-3, 2, 0);
+	UpperRightArmDef[1] = vec3(0, 0, 0);
+	UpperRightArmDef[2] = vec3(-2, 0, 0);
+	UpperRightArmDef[3] = vec3(4, 1.5, 2);
+	Component *UpperRightArm = new Component(UpperRightArmDef, ID, this->resourceDir);
+	cout << "UpperRightArm:" << ID << endl;
+	ID++;
+
+	vector<vec3> LowerRightArmDef(4);
+	LowerRightArmDef[0] = vec3(-4, 0, 0);
+	LowerRightArmDef[1] = vec3(0, 0, 0); 
+	LowerRightArmDef[2] = vec3(-2, 0, 0);
+	LowerRightArmDef[3] = vec3(4, 1, 2);
+	Component *LowerRightArm = new Component(LowerRightArmDef, ID, this->resourceDir);
+	cout << "LowerRightArm:" << ID << endl;
+	ID++;	
+	UpperRightArm->addChild(LowerRightArm); // Link the upper and the lower parts of the right arm.
+	
+	vector<vec3> UpperLeftLegDef(4);
+	UpperLeftLegDef[0] = vec3(1.5, -3.5, 0);
+	UpperLeftLegDef[1] = vec3(0, 0, 0);
+	UpperLeftLegDef[2] = vec3(0, -2, 0);
+	UpperLeftLegDef[3] = vec3(2, 4, 2);
+	Component *UpperLeftLeg = new Component(UpperLeftLegDef, ID, this->resourceDir);
+	cout << "UpperLeftLeg:" << ID << endl;
+	ID++;
+	vector<vec3> LowerLeftLegDef(4);	
+	LowerLeftLegDef[0] = vec3(0, -4, 0);
+	LowerLeftLegDef[1] = vec3(0, 0, 0);
+	LowerLeftLegDef[2] = vec3(0, -2, 0);
+	LowerLeftLegDef[3] = vec3(1.5, 4, 2);
+	Component *LowerLeftLeg = new Component(LowerLeftLegDef, ID, this->resourceDir);
+	cout << "LowerLeftLeg:" << ID << endl;	
+	ID++;
+	UpperLeftLeg->addChild(LowerLeftLeg); // Link the upper and the lower parts of the left leg.
+	
+	vector<vec3> UpperRightLegDef(4);
+	UpperRightLegDef[0] = vec3(-1.5, -3.5, 0);
+	UpperRightLegDef[1] = vec3(0, 0, 0);
+	UpperRightLegDef[2] = vec3(0, -2, 0);
+	UpperRightLegDef[3] = vec3(2, 4, 2);
+	Component *UpperRightLeg = new Component(UpperRightLegDef, ID, this->resourceDir);
+	cout << "UpperRightLeg:" << ID << endl;
+	ID++;
+
+	vector<vec3> LowerRightLegDef(4);
+	LowerRightLegDef[0] = vec3(0, -4, 0);
+	LowerRightLegDef[1] = vec3(0, 0, 0);
+	LowerRightLegDef[2] = vec3(0, -2, 0);
+	LowerRightLegDef[3] = vec3(1.5, 4, 2);
+	Component *LowerRightLeg = new Component(LowerRightLegDef, ID, this->resourceDir);
+	cout << "LowerRightLeg:" << ID << endl;
+	ID++;
+	UpperRightLeg->addChild(LowerRightLeg); // Link the upper and the lower parts of the Right leg.
+	
+	// Put each component into the robot.
+	this->addRoot(Torso);
+	this->addHead(Head);
+	this->addUpArm(UpperLeftArm);
+	this->addUpArm(UpperRightArm);
+	this->addUpLeg(UpperLeftLeg);
+	this->addUpLeg(UpperRightLeg);
+	
+	this->N = ID;
+	DFS();
+	cout << "(#" << this->trajectory.size() << ")\n";
+	this->selectID = 0; 
+	cout << "Initial select Torso(0)\n";
+
+	
+	
+}
+
+void Robot::addRoot(Component R){
+	this->root = new Component(R.compDef, R.ID, this->resourceDir);
+}
+
+void Robot::addHead(Component* head){
+	this->root->addChild(head);
+}
+
+void Robot::addUpArm(Component* UpArm){ // UpArm already links to its lower arm.
+	this->root->addChild(UpArm);
+}
+
+void Robot::addUpLeg(Component* UpLeg){ // UpLeg already links to its lower leg.
+	this->root->addChild(UpLeg);
+}
+
+void Robot::selectForward(){
+	if(this->selectID == -1){
+		cout << "Prev:" << this->selectID << "->";
+		this->selectID = 0;
+		this->root->compDef[3].x += 0.3;	
+		this->root->compDef[3].y += 0.3;	
+		this->root->compDef[3].z += 0.3;
+		cout << "Curr:" << this->selectID << endl;	
+	}
+	else{
+		cout << "Prev:" << this->selectID << "->";
+		// Recover the scale for the old selected component.
+		this->trajectory[this->selectID]->compDef[3].x -= 0.3;
+		this->trajectory[this->selectID]->compDef[3].y -= 0.3;
+		this->trajectory[this->selectID]->compDef[3].z -= 0.3;
+		// Update the scale for new selected component.
+		this->selectID += 1;
+		if(this->selectID >= (int)this->trajectory.size()){
+			this->selectID = 0;		
+		}
+		this->trajectory[this->selectID]->compDef[3].x += 0.3;
+		this->trajectory[this->selectID]->compDef[3].y += 0.3;
+		this->trajectory[this->selectID]->compDef[3].z += 0.3;
+		cout << "Curr:" << this->selectID << endl;	
+			
+	}
+}
+
+void Robot::selectBackward(){
+	if(this->selectID == -1){
+		cout << "Prev:" << this->selectID << "->";
+		this->selectID = 0;
+		this->root->compDef[3].x += 0.3;	
+		this->root->compDef[3].y += 0.3;	
+		this->root->compDef[3].z += 0.3;
+		cout << "Curr:" << this->selectID << endl;	
+	}
+	else{
+		cout << "Prev:" << this->selectID << "->";
+		// Recover the scale for the old selected component.
+		this->trajectory[this->selectID]->compDef[3].x -= 0.3;
+		this->trajectory[this->selectID]->compDef[3].y -= 0.3;
+		this->trajectory[this->selectID]->compDef[3].z -= 0.3;
+		// Update the scale for new selected component.
+		this->selectID -= 1;
+		if(this->selectID < 0){
+			this->selectID = (int)this->trajectory.size() - 1;		
+		}
+		this->trajectory[this->selectID]->compDef[3].x += 0.3;
+		this->trajectory[this->selectID]->compDef[3].y += 0.3;
+		this->trajectory[this->selectID]->compDef[3].z += 0.3;
+		cout << "Curr:" << this->selectID << endl;	
+			
+	}
+}
+
+void Robot::rotate(char flag){
+	if(this->selectID == -1){
+		this->selectID = 0;
+		this->trajectory[this->selectID]->compDef[3].x += 0.3;
+		this->trajectory[this->selectID]->compDef[3].y += 0.3;
+		this->trajectory[this->selectID]->compDef[3].z += 0.3;	
+	}
+	switch(flag){
+	case 'x':
+		cout << "x\n";
+		rotateX(1);
+		break;
+	case 'X':
+		cout << "X\n";
+		rotateX(0);
+		break;
+	case 'y':
+		cout << "y\n";
+		rotateY(1);
+		break;
+	case 'Y':
+		cout << "Y\n";
+		rotateY(0);
+		break;
+	case 'z':
+		cout << "z\n";
+		rotateZ(1);
+		break;
+	case 'Z':
+		cout << "Z\n";
+		rotateZ(0);
+		break;
+	}
+}
+
+void Robot::rotateX(int flag){
+	if(flag > 0) // 'x'
+		this->trajectory[this->selectID]->compDef[1].x += 1;
+	else // 'X'
+		this->trajectory[this->selectID]->compDef[1].x -= 1;
+}
+void Robot::rotateY(int flag){
+	if(flag > 0) // 'y'
+		this->trajectory[this->selectID]->compDef[1].y += 1;
+	else // 'Y'
+		this->trajectory[this->selectID]->compDef[1].y -= 1;
+}
+void Robot::rotateZ(int flag){
+	if(flag > 0) // 'z'
+		this->trajectory[this->selectID]->compDef[1].z += 1;
+	else // 'Z'
+		this->trajectory[this->selectID]->compDef[1].z -= 1;
+}
+
+
+void Robot::DFS(){
+	// Mark all the vertices as not visited
+    	vector<bool> visited(this->N, false);
+ 
+    	// Call the recursive helper function
+    	// to print DFS traversal
+    	DFSUtil(this->root, visited);
+}
+
+void Robot::DFSUtil(Component* comp, vector<bool> &visited){
+	// Mark the current node as visited and
+    	// print it
+    	visited[comp->ID] = true;
+    	cout << comp->ID << " ";
+	this->trajectory.push_back(comp);
+ 
+    	// Recur for all the vertices adjacent
+    	// to this vertex
+	for(size_t i = 0; i < comp->children.size(); i++){
+		if(!visited[comp->children[i]->ID])
+            		DFSUtil(comp->children[i], visited);
+	}
+}
+
+
+
+
+
+
